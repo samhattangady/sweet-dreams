@@ -37,6 +37,16 @@ class Binance:
                 headers={'X-MBX-APIKEY': self.api_key})
         return r
 
+    def buy_order(self, symbol, price, quantity):
+        request = f'symbol={symbol}&side=BUY&type=LIMIT&timeInForce=GTC&quantity={quantity}&price={price}'
+        r = self.execute_request(request, action='post')
+        return r
+
+    def sell_order(self, symbol, price, quantity):
+        request = f'symbol={symbol}&side=SELL&type=LIMIT&timeInForce=GTC&quantity={quantity}&price={price}'
+        r = self.execute_request(request, action='post')
+        return r
+
     def query_order(self, symbol, order_id):
         request = f'symbol={symbol}&orderId={order_id}'
         r = self.execute_request(request, action='get')

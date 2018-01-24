@@ -38,3 +38,15 @@ class Stenographer:
         # TODO. Deal with IndexError here
         return cursor[0]
 
+    def record_order(self, order):
+        # TODO Add the order to db
+        pass
+
+    def repeat_order(self, symbol):
+        # TODO Return the most recent order
+        pass
+
+    def update_order(self, symbol):
+        # TODO Update the order based on the state of order in exchange
+        pass
+

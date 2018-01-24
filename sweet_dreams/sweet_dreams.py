@@ -1,4 +1,5 @@
-
+from apis import Binance
+from stenographer import Stenographer
 
 class SweetDreams:
     """
@@ -6,8 +7,8 @@ class SweetDreams:
     while you sleep. It is the next stage of evolution of polaroid.
     """
 
-    def __init__(self, exchange, pair):
-        self.exchange = exchange
+    def __init__(self, pair):
+        self.exchange = Binance()
         self.pair = pair
 
     

@@ -8,7 +8,7 @@ import apis
 
 class Stenographer:
     """
-    Peeker keeps track of sweet_dreams
+    Stenographer keeps track of sweet_dreams
     """
     def __init__(self, exchange='binance'):
         self.exchange = exchange
@@ -20,7 +20,7 @@ class Stenographer:
         if self.exchange == 'binance':
             self.engine = apis.Binance()
 
-    def update_prices(self, symbol):
+    def record_price(self, symbol):
         rates = self.engine.get_order_book(symbol)
         ask = rates['asks'][0]
         bid = rates['bids'][0]
@@ -33,7 +33,7 @@ class Stenographer:
         }
         self.database.prices.insert_one(entry)
 
-    def repeat_prices(self, symbol):
+    def repeat_price(self, symbol):
         cursor =  self.database.prices.find({'symbol': symbol}).sort([('time', -1)]).limit(1)
         # TODO. Deal with IndexError here
         return cursor[0]

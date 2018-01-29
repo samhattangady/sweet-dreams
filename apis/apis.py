@@ -15,17 +15,23 @@ class Binance:
     def get_order_book(self, symbol, depth=10):
         r = requests.get(f'{self.api_root}/api/v1/depth', params={'symbol':symbol, 'limit': 5})
         if not r.ok:
-            return {'error': r}
+            return {'error': r.json()}
         order_book = r.json()
         bids = [{'price': float(bid[0]), 'quantity': float(bid[1])} for bid in order_book['bids'][:depth]]
         asks = [{'price': float(ask[0]), 'quantity': float(ask[1])} for ask in order_book['asks'][:depth]]
         return {'bids': bids, 'asks': asks}
 
-    def execute_request(self, request, action='post'):
-        message = f'{request}&timestamp={str(int(time.time() * 1000))}'
-        message_bytes = bytes(message, 'utf-8')
-        secret = bytes(self.secret, 'utf-8')
-        signature = hmac.new(secret, msg=message_bytes, digestmod=hashlib.sha256).hexdigest()
+    def get_balance(self):
+        message, signature = self._get_message_and_signature(request)
+        r = requests.get(f'{self.api_root}/api/v3/account',
+                params=f'{message}&signature={signature}',
+                headers={'X-MBX-APIKEY': self.api_key})
+        if not r.ok:
+            return {'error': r.json()}
+        return r.json()['balances']
+
+    def execute_order_request(self, request, action='post'):
+        message, signature = self._get_message_and_signature(request)
         if action == 'post':
             req = requests.post
         elif action == 'get':
@@ -35,25 +41,28 @@ class Binance:
         r = req(f'{self.api_root}/api/v3/order', 
                 params=f'{message}&signature={signature}',
                 headers={'X-MBX-APIKEY': self.api_key})
-        return r
+        if not r.ok:
+            return {'error': r.json()}
+        return r.json()
 
-    def buy_order(self, symbol, price, quantity):
-        request = f'symbol={symbol}&side=BUY&type=LIMIT&timeInForce=GTC&quantity={quantity}&price={price}'
-        r = self.execute_request(request, action='post')
-        return r
-
-    def sell_order(self, symbol, price, quantity):
-        request = f'symbol={symbol}&side=SELL&type=LIMIT&timeInForce=GTC&quantity={quantity}&price={price}'
-        r = self.execute_request(request, action='post')
+    def place_order(self, side, symbol, price, quantity):
+        request = f'symbol={symbol}&side={side.upper()}&type=LIMIT&timeInForce=GTC&quantity={quantity}&price={price}'
+        r = self.execute_order_request(request, action='post')
         return r
 
     def query_order(self, symbol, order_id):
         request = f'symbol={symbol}&orderId={order_id}'
-        r = self.execute_request(request, action='get')
+        r = self.execute_order_request(request, action='get')
         return r
 
     def delete_order(self, symbol, order_id):
         request = f'symbol={symbol}&orderId={order_id}'
-        print(request)
-        r = self.execute_request(request, action='delete')
+        r = self.execute_order_request(request, action='delete')
         return r
+
+    def _get_message_and_signature(self, request):
+        message = f'{request}&timestamp={str(int(time.time() * 1000))}'
+        message_bytes = bytes(message, 'utf-8')
+        secret = bytes(self.secret, 'utf-8')
+        signature = hmac.new(secret, msg=message_bytes, digestmod=hashlib.sha256).hexdigest()
+        return message, signature

@@ -50,3 +50,19 @@ class Stenographer:
         # TODO Update the order based on the state of order in exchange
         pass
 
+    def record_strategy(self, symbol, strategy):
+        # TODO Update the strategy
+        pass
+
+    def repeat_strategy(self, symbol):
+        # TODO Return the most recent strategy
+        pass
+
+    def record_trade(self, symbol, trade):
+        # TODO Record the trade
+        pass
+
+    def repeat_trade(self, symbol):
+        # TODO Return the most recent trade
+        pass
+

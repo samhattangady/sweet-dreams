@@ -1,9 +1,9 @@
 import json
 
 import initial_setup
-from sweetdreams import SweetDreams
+from sweet_dreams import SweetDreams
 
-JOB_DELAY_SECONDS = 1
+JOB_DELAY_SECONDS = 2
 
 
 def main():
@@ -19,3 +19,6 @@ def main():
         else:
             raise RuntimeError(f'job: {job} not identified')
         queue.release(raw_job, delay=JOB_DELAY_SECONDS)
+
+if __name__ == '__main__':
+    main()

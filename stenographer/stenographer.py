@@ -53,7 +53,6 @@ class Stenographer:
             'ask': order['ask'],
             'status': order['status'].lower(),
             'order_id': order['orderId']
-            'status': order
         }
         self.database.orders.insert_one(to_insert)
 
@@ -67,7 +66,7 @@ class Stenographer:
         # For first ever order, don't try to update
         if 'order_id' not in current_order:
             return
-        order = self.engine.query_order(self, symbol, current_order['order_id'])
+        order = self.engine.query_order(symbol, current_order['order_id'])
         statusses = {'NEW': 'new', 'PARTIALLY_FILLED': 'partial', 'FILLED': 'filled',
                 'CANCELED': 'cancelled'}
         status = statusses.get(order['status'], order['status'])
@@ -87,14 +86,16 @@ class Stenographer:
         del trade['ask']
         del trade['bid']
         del trade['status']
+        if '_id' in trade:
+            del trade['_id']
         trade['time'] = time.time()
         trade['base_value'] = trade['price'] * trade['quantity']
         trade['commodity_value'] = trade['quantity']
         self.database.trades.insert_one(trade)
         # total_value calculation may cause RuntimeErrors. Don't want that 
         # to prevent the recording of the trade in db
-        total_value = self.exchange.get_account_value()
-        self.database.update_one({'order_id': trade['order_id']}, {'$set': {'total_value': total_value}})
+        total_value = self.engine.get_account_value()
+        self.database.trades.update_one({'order_id': trade['order_id']}, {'$set': {'total_value': total_value}})
 
     def repeat_trade(self, symbol):
         cursor = self.database.trades.find({'symbol': symbol}).sort([('time', -1)]).limit(1)

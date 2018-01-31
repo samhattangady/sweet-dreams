@@ -13,15 +13,15 @@ def check_db():
         raise RuntimeError('Expecting MongoDB to be running at localhost:27017')
     return client
 
-def setub_db(client):
+def setup_db(client):
     database = client.sweet_dreams
     collections = database.collection_names()
-    # Create 1GB capped collections for prices and orders if they dont exist
+    # Create 1GB capped collections for prices if it doesnt exist
     if not 'prices' in collections:
         database.create_collection('prices', capped=True, size=2**30)
+    # Create collections for orders, trades and strategies
     if not 'orders' in collections:
-        database.create_collection('orders', capped=True, size=2**30)
-    # Create collections for trades and strategies
+        database.create_collection('orders')
     if not 'trades' in collections:
         database.create_collection('trades')
     if not 'strategies' in collections:

@@ -1,1 +1,1 @@
-from .sweetdreams import SweetDreams
+from .sweet_dreams import SweetDreams

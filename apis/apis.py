@@ -21,8 +21,8 @@ class Binance:
         asks = [{'price': float(ask[0]), 'quantity': float(ask[1])} for ask in order_book['asks'][:depth]]
         return {'bids': bids, 'asks': asks}
 
-    def get_balance(self):
-        message, signature = self._get_message_and_signature(request)
+    def get_balances(self):
+        message, signature = self._get_message_and_signature('')
         r = requests.get(f'{self.api_root}/api/v3/account',
                 params=f'{message}&signature={signature}',
                 headers={'X-MBX-APIKEY': self.api_key})
@@ -37,16 +37,18 @@ class Binance:
         value = 0
         for currency in balances:
             total = float(currency['free']) + float(currency['locked'])
+            if not total:
+                continue
             if currency['asset'] == 'BTC':
                 value += total
             else:
                 rates = self.get_order_book(currency['asset']+'BTC')
                 if 'error' in rates:
-                    raise RuntimeError(r'Error in getting rates: {rates["error"]}')
+                    raise RuntimeError(f'Error in getting rates: {rates["error"]}')
                 ask = float(rates['asks'][0]['price'])
                 bid = float(rates['bids'][0]['price'])
                 mid = (ask + bid) / 2
-                value = total * mid
+                value += total * mid
         return value
 
 

@@ -30,6 +30,26 @@ class Binance:
             return {'error': r.json()}
         return r.json()['balances']
 
+    def get_account_value(self):
+        balances = self.get_balances()
+        if 'error' in balances:
+            raise RuntimeError(f'Error in fetching balances: {balances["error"]}')
+        value = 0
+        for currency in balances:
+            total = float(currency['free']) + float(currency['locked'])
+            if currency['asset'] == 'BTC':
+                value += total
+            else:
+                rates = self.get_order_book(currency['asset']+'BTC')
+                if 'error' in rates:
+                    raise RuntimeError(r'Error in getting rates: {rates["error"]}')
+                ask = float(rates['asks'][0]['price'])
+                bid = float(rates['bids'][0]['price'])
+                mid = (ask + bid) / 2
+                value = total * mid
+        return value
+
+
     def execute_order_request(self, request, action='post'):
         message, signature = self._get_message_and_signature(request)
         if action == 'post':

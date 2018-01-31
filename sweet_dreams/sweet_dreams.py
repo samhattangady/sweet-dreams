@@ -28,14 +28,20 @@ class SweetDreams:
     then selling high, it first sells high and then buys low. The thing it is
     betting on is small corrections in the direction opposite to the trend.
 
-    Theoretically, the only loss that sweet dreams would have are on
+    Theoretically, one of the losses that sweet dreams would have are on
     multiple continous flips. Such a situation should be very rare, and it
     should be possible to ensure that this doesn't happen using the correct
     parameters for flipping. Because such fluctuations should be where the 
     most money is to be made.
+
+    The other situation where losses would be faced are when there is a sharp
+    movement without any corrections. Since the strategy is designed around
+    exploiting the small corrections in the general trend, if there are two
+    sharp movements consecutively, it could cause a lot of loss. But the 
+    likelihood of that seems low.
     """
 
-    def __init__(self, exchange):
+    def __init__(self, exchange='binance'):
         self.exchange = exchange
         self.stenographer = Stenographer()
         self._init_exchange()
@@ -51,15 +57,22 @@ class SweetDreams:
         self.stenographer.update_order(symbol)
 
     def perform_trade(self, symbol):
-        self.symbol = task['symbol']
+        self.symbol = symbol
         self._set_class_variables()
-        if self.previous_order['status'] in ['unfilled', 'partial']:
-            # Depending on the change, see if you need to change price, or
-            # change the trend
-            self._check_prices()
+        if self.previous_order['status'] in ['new', 'partial']:
+            # Depending on the change, see if you need to cancel and change
+            # price (either aggresive or due to change of trend)
+            self._track_order()
         elif self.previous_order['status'] in ['filled']:
+            # Record filled order as trade
+            # Change the side
             # Place the next buy or sell order
-            pass
+            self._start_new_order()
+        elif self.previous_order['status'] in ['cancelled']:
+            # Place the order on the same side
+            self._place_order()
+        else:
+            raise RuntimeError(f'Cannot identify status: {self.previous_order["status"]}')
 
     def _set_class_variables(self):
         self.previous_order = self.stenographer.repeat_order(self.symbol)
@@ -75,7 +88,20 @@ class SweetDreams:
         if 'error' in order:
             raise RuntimeError(order['error'])
         order['bid'], order['ask'] = rates['bid'], rates['ask']
-        self.stenographer.record_order(order)
+        order['base'] = self.strategy['base']
+        order['commodity'] = self.strategy['commodity']
+        self.stenographer.record_order(self.symbol, order)
+
+    def _cancel_standing_order(self):
+        order = self.exchange.delete_order(self.symbol, self.previous_order['order_id'])
+        if 'error' in order:
+            raise RuntimeError(order['error'])
+        self.stenographer.update_order(self.symbol)
+
+    def _start_new_order(self):
+        self.stenographer.record_trade(self.previous_order)
+        self.side = 'buy' if self.side == 'sell' else 'sell'
+        self._place_order()
 
     def _get_order_price_and_quantity(self, mid):
         spread_percent = self.strategy['profit_spread']
@@ -110,10 +136,31 @@ class SweetDreams:
         amount = int(amount * 10**digits)
         return amount/10**digits
 
-    def _check_prices(self):
-        current_price = self.stenographer.repeat_price(self.symbol)
-        current_mid_price = (current_price['bid'] + current_price['ask']) / 2
-        order_mid_price = (self.previous_order['bid'] + self.previous_order['ask']) / 2
+    def _track_order(self):
+        first_leg, with_trend = self._get_leg_and_trend()
+        if first_leg and with_trend:
+            # If on first leg and price is with trend, be aggressive
+            # Cancel current order and place a new order according to new mid
+            # on the same side
+            self._cancel_standing_order()
+            self._place_order()
+        elif not first_leg and not with_trend:
+            # If on second leg, and price is against trend, then our prediction
+            # is wrong. Check if price has changed enough to warrant a change of
+            # trend. If it is, cancel order, and place a new order on same side
+            # according to current mid.
+            if self._check_trend_flip():
+                self._cancel_standing_order()
+                self._place_order()
+        else:
+            # If on first leg and price is against trend, the correction 
+            # that we are betting on has started. Do nothing
+            # if on the second leg and price is with trend, then trend prediction
+            # is correct. Wait for order to go through. Do nothing
+            return
+
+    def _get_leg_and_trend(self):
+        current_mid_price, order_mid_price = self._get_mid_prices()
         # There are 4 possibilities, first_leg and with_trend are boolean
         buying = self.side == 'buy'
         uptrending = self.trend == 'up'
@@ -122,21 +169,21 @@ class SweetDreams:
         # first_leg = (buying and uptrending) or (not buying and not uptrending)
         first_leg = not (buying ^ uptrending)
         with_trend = not (uptrending ^ increasing)
-        if first_leg and with_trend:
-            # If on first leg and price is with trend, be aggressive
-            # Cancel current order and place a new order according to new mid
-            # on the same side
-            pass
-        elif not first_leg and not with_trend:
-            # If on second leg, and price is against trend, then our prediction
-            # is wrong. Check if price has changed enough to warrant a change of
-            # trend. If it is, cancel order, and place a new order on same side
-            # according to current mid.
-            pass
-        else:
-            # If on first leg and price is against trend, the correction 
-            # that we are betting on has started. Do nothing
-            # if on the second leg and price is with trend, then trend prediction
-            # is correct. Wait for order to go through. Do nothing
-            pass
+        return first_leg, with_trend
+
+    def _get_mid_prices(self):
+        current_price = self.stenographer.repeat_price(self.symbol)
+        current_mid_price = (current_price['bid'] + current_price['ask']) / 2
+        order_mid_price = (self.previous_order['bid'] + self.previous_order['ask']) / 2
+        return current_mid_price, order_mid_price
+
+    def _check_trend_flip(self):
+        current_mid_price, order_mid_price = self._get_mid_prices()
+        pct_change = abs(current_mid_price - order_mid_price) / order_mid_price / 100
+        if  pct_change > self.strategy['trend_flip_threshhold']:
+            self.strategy['trend'] = 'up' if self.trend == 'down' else 'down'
+            self.stenographer.record_strategy(self.symbol, self.strategy)
+            self.trend = self.strategy['trend']
+            return True
+        return False
 

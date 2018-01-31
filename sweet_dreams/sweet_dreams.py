@@ -82,8 +82,12 @@ class SweetDreams:
         self.side = self.previous_order['side'].lower()
         self.trend = self.strategy['trend']
 
-    def _place_order(self):
-        rates = self.stenographer.repeat_price(self.symbol)
+    def _place_order(self, second_leg=False):
+        if second_leg:
+            # If on the second leg, we want to set our price based on first leg
+            rates = self.stenographer.repeat_order(self.symbol)
+        else:
+            rates = self.stenographer.repeat_price(self.symbol)
         mid = (rates['ask'] + rates['bid']) / 2
         price, quantity = self._get_order_price_and_quantity(mid)
         print(f'Placing order: {self.side} {quantity} of {self.symbol} at {price}')
@@ -106,7 +110,7 @@ class SweetDreams:
         print('Trade successful. Recording')
         self.stenographer.record_trade(self.symbol, self.previous_order)
         self.side = 'buy' if self.side == 'sell' else 'sell'
-        self._place_order()
+        self._place_order(second_leg=True)
 
     def _get_order_price_and_quantity(self, mid):
         spread_percent = self.strategy['profit_spread']
@@ -162,6 +166,9 @@ class SweetDreams:
             print('checking trend flip...', end=' ')
             if self._check_trend_flip():
                 print('trend has flipped')
+                self.strategy['trend'] = 'up' if self.trend == 'down' else 'down'
+                self.stenographer.record_strategy(self.symbol, self.strategy)
+                self.trend = self.strategy['trend']
                 self._cancel_standing_order()
                 self._place_order()
             else:
@@ -196,9 +203,6 @@ class SweetDreams:
         current_mid_price, order_mid_price = self._get_mid_prices()
         pct_change = abs(current_mid_price - order_mid_price) / order_mid_price / 100
         if  pct_change > self.strategy['trend_flip_threshhold']:
-            self.strategy['trend'] = 'up' if self.trend == 'down' else 'down'
-            self.stenographer.record_strategy(self.symbol, self.strategy)
-            self.trend = self.strategy['trend']
             return True
         return False
 

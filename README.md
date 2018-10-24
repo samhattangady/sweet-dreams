@@ -40,3 +40,8 @@ movement without any corrections. Since the strategy is designed around
 exploiting the small corrections in the general trend, if there are two
 sharp movements consecutively, it could cause a lot of loss. But the
 likelihood of that seems low.
+
+## Technologies used
+1. Beanstalk - Queue
+2. MongoDB
+3. Python3
